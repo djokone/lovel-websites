@@ -1,0 +1,474 @@
+ @import url('https://fonts.googleapis.com/css?family=Roboto:100,100i,300,300i,400,400i,500,500i,700,700i,900,900i');
+
+ *:focus {
+   outline: none;
+ }
+
+ button {
+   border: 0px none;
+   border-style: none;
+ }
+ //body {
+ //  overflow-x: hidden;
+ //}
+ //$six: rgb(255, 0, 230);
+ //$sixT: rgba(255, 0, 230, 0.6);
+ //$cinq: rgb(214, 56, 233);
+ //$cinqT: rgba(214, 56, 233, 0.6);
+ //$quatre: rgb(116, 78, 239);
+ //$quatreT: rgba(116, 78, 239, 0.6);
+ //$trois: rgb(67, 98, 248);
+ //$deux: rgb(84, 207, 255);
+ //$un: rgb(59, 255, 194);
+ //$zero: rgb(0, 255, 102);
+
+ $six: rgb(255, 0, 230);
+ $sixT: rgba(255, 0, 230, 0.6);
+ $cinq: rgb(253, 84, 170);
+ $cinqT: rgba(214, 56, 233, 0.6);
+ $quatre: rgb(156, 85, 223);
+ $quatreT: rgba(116, 78, 239, 0.6);
+ $trois: rgb(86, 67, 235);
+ $deux: rgb(84, 207, 255);
+ $un: rgb(53, 230, 170);
+ $zero: rgb(0, 255, 102);
+
+ /*
+ * Grids
+ */
+ $smallPhoneScreen: (
+         columns: 6,
+         gutter: 20px,
+         media: '(min-width: 0px) and (max-width: 450px)'
+ );
+
+ $phoneScreen: (
+   columns: 6,
+   gutter: 20px,
+   media: '(min-width: 0px) and (max-width: 800px)'
+ );
+ $mediumScreen: (
+         columns: 12,
+         gutter: 20px,
+         media: '(min-width: 450px) and (max-width: 1100px)'
+ );
+ $mediumScreenAll: (
+         columns: 12,
+         gutter: 20px,
+         media: '(min-width: 0px) and (max-width: 1000px)'
+ );
+ $LargeScreen: (
+   columns: 12,
+   gutter: 20px,
+   media: 1100px
+ );
+ $bigScreen: (
+         columns: 12,
+         gutter: 20px,
+         media: 1300px
+ );
+ $extraBigScreen: (
+         columns: 12,
+         gutter: 20px,
+         media: 1500px
+ );
+
+ $neat-grid: (
+   columns: 12,
+   gutter: 20px
+ );
+
+ #website {
+
+   .topNav {
+     position: fixed;
+     top: 0px; left: 0px; right: 0px;
+     background: white;
+     z-index: 100;
+     box-shadow: 0px 0px 18px 0px rgba(0, 0, 0, .2);
+     height: 80px
+   }
+   .logo-typo {
+     font-family: 'Roboto', sans-serif;
+     position: absolute;
+     font-size: 1.5em;
+     margin: 0px;
+     left: 110px;
+     font-weight: 400;
+     top: 30px;
+     background: -webkit-gradient(linear, left bottom, left top, from($quatre), to($cinq));
+     -webkit-background-clip: text;
+     -webkit-text-fill-color: transparent;
+   }
+   .logo {
+     position: absolute;
+     top: 10px;
+     left: 30px;
+     img {
+       width: 100px;
+     }
+   }
+   #allNotification{
+     position: fixed;
+     top: 60px;
+     right: 20px;
+     z-index: 20;
+     font-family: 'Roboto', sans-serif;
+   }
+   .menu {
+     @include grid-container;
+     background: white;
+     .item {
+       @include grid-shift(16);
+       @include grid-column(2);
+       /*background: red;*/
+     }
+   }
+   .bold {
+     font-weight: 300 !important;
+   }
+   .contain {
+     padding: 0px 5%;
+     position: relative;
+     @include grid-container;
+     @include grid-media($phoneScreen) {
+       padding: 0px 5%;
+     }
+     @include grid-media($mediumScreen) {
+       padding: 0px 5%;
+     }
+     @include grid-media($extraBigScreen) {
+       padding: 0px 15%;
+     }
+   }
+
+   .col1 {
+     @include grid-column(1)
+   }
+   .col2 {
+     @include grid-column(2)
+   }
+   .col3 {
+     @include grid-column(3)
+   }
+   .col4 {
+     @include grid-column(4)
+   }
+   .col5 {
+     @include grid-column(5)
+   }
+   .col6 {
+     @include grid-column(6)
+   }
+   .col7 {
+     @include grid-column(7)
+   }
+   .col8 {
+     @include grid-column(8)
+   }
+   .col9 {
+     @include grid-column(9)
+   }
+   .col10 {
+     @include grid-column(10)
+   }
+   .col11 {
+     @include grid-column(11)
+   }
+   .col12 {
+     @include grid-column(12)
+   }
+   .shift5 {
+     @include grid-shift(5)
+   }
+   .shift1 {
+     @include grid-shift(1)
+   }
+   .shift2 {
+     @include grid-shift(2)
+   }
+   .shift3 {
+     @include grid-shift(3)
+   }
+   .fullHeight {
+     height: 100%;
+   }
+   .container {
+     .inputBlock {
+       position: relative;
+       &>.error {
+         position: absolute;
+         color: $six;
+         font-size: 0.80em;
+         bottom: -5px; right: 10px;
+         text-align: right;
+       }
+     }
+     .input {
+       box-sizing: border-box;
+       margin: 1em 0;
+     }
+     //
+     // Lovel colors
+     //
+     &.multi {
+       background-image:linear-gradient(20deg, $cinq, $quatre 33%, $trois 67%, $un 100%);
+       &::after {
+         content: "";
+         display: block;
+         //z-index: 200;
+         position: absolute;
+         bottom: -1px;
+         left: 0px;
+         right: 0px;
+         height: 145px;
+         //margin-top: -150px;
+         background: white;
+         box-shadow: 0px -10px 18px 0px rgba(0, 0, 0, 1);
+         clip-path: polygon(0 100%, 100% 0%, 100% 100%, 0% 100%);
+         -webkit-clip-path: polygon(0 100%, 100% 0%, 100% 100%, 0% 100%);
+         @include grid-media($phoneScreen) {
+           height: 80px;
+         }
+       }
+       .highlight {
+         padding: 2px 3px;
+         font-weight: 500;
+         display: inline;
+         background: $six;
+         color: white;
+       }
+       .subtitle .highlight {
+         background: $cinq;
+       }
+       .label {
+         color: $un;
+         font-weight: 300;
+       }
+       .input {
+         color: $six;
+         &::placeholder {
+           color: $cinq;
+         }
+       }
+       .title {
+         color: white;
+         font-weight: 500;
+       }
+       .solidBorder {
+         border: 1px solid $un;
+       }
+       .btn {
+         cursor: pointer;
+         color: $un;
+         font-weight: 300;
+         @include grid-media($phoneScreen) {
+           background: $un;
+           color: $quatre;
+         }
+         &:hover {
+           //opacity: 1;
+           //background: linear-gradient(90deg, $un, rgba(255, 255, 255, 0));
+           background: $un;
+           //background-color: $trois;
+           transition: background-color 0.5s ease;
+
+           color: $quatre;
+         }
+       }
+     }
+     &.one {
+       background-image:linear-gradient(20deg, $un, $zero);
+       &::after {
+         content: "";
+         display: block;
+         //z-index: 200;
+         position: absolute;
+         bottom: -1px;
+         left: 0px;
+         right: 0px;
+         height: 145px;
+         //margin-top: -150px;
+         background: white;
+         box-shadow: 0px -10px 18px 0px rgba(0, 0, 0, 1);
+         -webkit-clip-path: polygon(0 100%, 100% 0%, 100% 100%, 0% 100%);
+         clip-path: polygon(0 100%, 100% 0%, 100% 100%, 0% 100%);
+         -webkit-clip-path: polygon(0 100%, 100% 0%, 100% 100%, 0% 100%);
+         @include grid-media($phoneScreen) {
+           height: 50px;
+         }
+       }
+       //background: -webkit-gradient(linear, left top, left bottom, from($zero), to($un));
+       //background-image:linear-gradient(20deg, $un, $zero);
+       //-webkit-clip-path: polygon(0 0, 100% 0%, 100% 70%, 0% 100%);
+       //clip-path: polygon(0 0, 100% 0%, 100% 70%, 0% 100%);
+       h1, h2, h3, h4, h5, .label {
+         background: -webkit-gradient(linear, left bottom, left top, from($quatre), to($cinq));
+         -webkit-background-clip: text;
+         -webkit-text-fill-color: transparent;
+       }
+       .text {
+         background: white;
+         font-size: 1.25em;
+         -webkit-background-clip: text;
+         -webkit-text-fill-color: unset;
+         color: $six;
+         margin-top: 0px;
+         font-weight: 400;
+       }
+       .input {
+         box-sizing: border-box;
+         color: $quatre;
+         &::placeholder {
+           color: $cinq;
+         }
+       }
+       .highlight {
+         padding: 2px 3px;
+         font-weight: 500;
+         display: inline;
+         background: $six;
+         color: white;
+       }
+       .subtitle .highlight {
+         background: $cinq;
+       }
+       .btn {
+         cursor: pointer;
+         color: $quatre;
+         border: 1px solid $quatre;
+         &:hover {
+           //opacity: 1;
+           background: linear-gradient(90deg, $quatreT, rgba(255, 255, 255, 0));
+           background-color: $sixT;
+           transition: background-color 0.5s ease;
+           //font-weight: 300;
+           color: $un;
+         }
+       }
+     }
+     &.two {
+       //background: -webkit-gradient(linear, left top, right bottom, from($un), to($deux));
+       background-image:linear-gradient(30deg, $deux, $un);
+       -webkit-clip-path: polygon(0 0, 100% 2%, 100% 100%, 0% 100%);
+       clip-path: polygon(0 0, 100% 4%, 100% 100%, 0% 85%);
+     }
+     &.three {
+       //background: -webkit-gradient(linear, left top, right bottom, from($un), to($deux));
+       background-image:linear-gradient(30deg, $trois, $deux);
+       -webkit-clip-path: polygon(0 10, 100% -10%, 100% 100%, 0% 100%);
+       clip-path: polygon(0 20, 100% -10%, 100% 100%, 0% 85%);
+     }
+     &.quatre {
+       //background: -webkit-gradient(linear, left top, right bottom, from($un), to($deux));
+       background-image:linear-gradient(0deg, $quatre, $trois);
+       //-webkit-clip-path: polygon(0 20, 100% -60%, 100% 100%, 0% 100%);
+       clip-path: polygon(0 24%, 100% 0%, 100% 100%, 0 82%);
+     }
+     &.cinq {
+       //background: -webkit-gradient(linear, left top, right bottom, from($un), to($deux));
+       background-image:linear-gradient(0deg, $quatre, $trois);
+       //-webkit-clip-path: polygon(0 20, 100% -60%, 100% 100%, 0% 100%);
+       clip-path: polygon(0 24%, 100% 0%, 100% 100%, 0 82%);
+     }
+     &.sixTop {
+       color: white;
+       padding-top: 0px;
+       background-image:linear-gradient(30deg, $quatre, $cinq);
+       &::after {
+         content: "";
+         display: block;
+         //z-index: 200;
+         position: absolute;
+         bottom: -1px;
+         left: 0px;
+         right: 0px;
+         height: 145px;
+         //margin-top: -150px;
+         background: white;
+         box-shadow: 0px -10px 18px 0px rgba(0, 0, 0, 1);
+         -webkit-clip-path: polygon(0 100%, 100% 0%, 100% 100%, 0% 100%);
+         clip-path: polygon(0 100%, 100% 0%, 100% 100%, 0% 100%);
+         -webkit-clip-path: polygon(0 100%, 100% 0%, 100% 100%, 0% 100%);
+         @include grid-media($phoneScreen) {
+           height: 50px;
+         }
+       }
+       .btn {
+         cursor: pointer;
+         text-decoration: none;
+         text-align: center;
+         font-weight: bold;
+         color: white;
+         background: $un;
+         transition: background-color 0.5s ease;
+         //border: 1px solid $quatre;
+         &:hover {
+           //opacity: 1;
+           background: linear-gradient(90deg, $deux, rgba(255, 255, 255, 0));
+           background-color: $un;
+           transition: background-color 0.5s ease;
+           //font-weight: 300;
+           color: white;
+         }
+       }
+     }
+     &.six {
+       color: white;
+       padding-top: 160px;
+       background-image:linear-gradient(30deg, $quatre, $cinq);
+       a {
+         color: $un;
+         font-weight: 300;
+         text-decoration: none;
+         &:hover{
+           color: $cinq;
+           padding-right: 20px;
+           background: $un;
+         }
+       }
+       .specialColor {
+         color: $un;
+       }
+       &::before {
+         content: "";
+         display: block;
+         //z-index: 200;
+         position: absolute;
+         top: -1px;
+         left: 0px;
+         right: 0px;
+         height: 145px;
+         //margin-top: -150px;
+         background: white;
+         //box-shadow: 0px -10px 18px 0px rgba(0, 0, 0, 1);
+         clip-path: polygon(0% 0%, 100% 0%, 100% 100%, 0% 0%);
+         -webkit-clip-path: polygon(0% 0%, 100% 0%, 100% 100%, 0% 0%);
+         @include grid-media($phoneScreen) {
+           height: 50px;
+         }
+       }
+     }
+   }
+
+   .LvSix {
+     .title {
+       color: $sixT;
+     }
+   }
+
+   .smallTitle {
+     font-size: 1.50em;
+     font-weight: 300 !important;
+     color: white;
+     margin-bottom: 1em;
+     &:after {
+       display: block;
+       content: '';
+       background: $un;
+       margin: 5px 0px;
+       height: 2px;
+       width: 60px;
+     }
+   }
+ }

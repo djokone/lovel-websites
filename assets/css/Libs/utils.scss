@@ -1,0 +1,92 @@
+
+// Class builder
+// 
+@mixin class-builder($obj, $prefix) {
+  @each $class, $props in $obj {
+    @if $class != all && $class != sizes {
+      .#{$prefix}_#{$class} {
+        @include generate-props(map-get($obj, all));
+        @include generate-props($props);
+      }
+    }
+  }
+}
+
+@mixin props-builder($obj, $key, $debug: false) {
+  @each $class, $props in $obj {
+    @if $class == $key {
+      // general settings
+      @include generate-props(map-get($obj, all), $debug)
+      // custom settings
+      @include generate-props($props, $debug)
+    }
+  }
+}
+
+@mixin generate-props($props, $debug: false) {
+  @each $prop, $value in $props {
+    @if type-of($value) != map {
+      @if $debug {
+        @debug $prop + ': ' + $value;
+      }
+      #{$prop}: #{$value};
+    } @else {
+      @if $debug {
+        @debug '&:' + $prop + '{';
+      }
+      &:#{$prop} {
+        @each $innerprop, $innervalue in $value {
+          @if $debug {
+            @debug $innerprop + ': ' + $innervalue;
+          }
+          #{$innerprop}: #{$innervalue}
+        }
+      }
+      @if $debug {
+        @debug '}';
+      }
+    }
+  }
+}
+
+@function length($map) {
+  $length: 0;
+  @each $v, $k in $map {
+    $length: $length + 1;
+  }
+  @return length;
+}
+// @function special-merge($obj, $merge) {
+//   $toReturn: ();
+//   @each $k, $v in $obj{
+//     $map
+//   }
+// }
+
+@mixin merge-class($obj, $toMerge, $prefix: false, $debug: false) {
+  @each $class, $props in $obj {
+    @if $class != all and $class != sizes {
+      @each $classMerge, $propsMerge in $toMerge {
+        @if $debug {
+          @debug $class + '_' + $classMerge + '{';
+        }
+        @if $prefix == false {
+          .#{$class}_#{$classMerge} {
+            @include props-builder($obj, $class, $debug)
+            @include generate-props($propsMerge)
+            // @include generate-props($props)
+          }
+        } @else {
+          .#{$prefix}_#{$class}_#{$classMerge} {
+            @include props-builder($obj, $class, $debug)
+            @include generate-props($propsMerge)
+          }
+        }
+        
+        @if $debug {
+          @debug '}';
+        }
+      }
+    }
+  }    
+}

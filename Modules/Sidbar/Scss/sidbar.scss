@@ -1,0 +1,180 @@
+
+//@import "bourbon";
+//@import "neat";
+@import '~bourbon-neat/core/neat';
+@import "config";
+
+
+.sidebar {
+  position:relative;
+  height: auto;
+  min-height: 300px;
+  h2{
+    font-family: $standardFont;
+    margin-bottom: 10px;
+  }
+}
+
+.burgerMenu {
+  display:none;
+  opacity: 0;
+  cursor: pointer;
+  width: 100%;
+  @include media(max-width 930px , 12) {
+    display:block;
+    opacity: 1;
+  }
+}
+
+#sidbar{
+  position: relative;
+  z-index: 3;
+  margin-top: 20px;
+  @include span-columns(4 of 12);
+
+  // lorsque l'écran mesure de 0 à 930px
+  // #sidbar
+  @include media(max-width 930px , 12) {
+    @include span-columns(2 of 12)
+    .responsive_big {
+      display:none;
+      opacity: 0;
+    }
+    .responsive_small {
+      opacity: 1;
+      display:block;
+    }
+    .responsive_small.close {
+        @include media(min-width 450px max-width 930px , 12) {
+          transform: translateX(-82.94039%)
+        }
+        @include media(max-width 450px , 12) {
+          transform: translateX(-76.76824%)
+        }
+      transform: translateX(-76.76824%)
+    }
+    .responsive_small.open {
+      transform: translateX(0)
+    }
+    .visible {
+      display: block;
+      opacity: 1;
+    }
+  }
+  .responsive_big {
+    opacity: 1;
+  }
+  .responsive_small {
+    transition: all 0.5s ease-in-out;
+    //@include clearfix;
+    @include span-columns(8);
+    z-index: 100;
+    position: absolute;
+    top: 110px;
+    bottom:0px;
+    left: 10px;
+    opacity: 1;
+    display:none;
+    .burgerMenu {
+      margin-top: 39px;
+      @include media(min-width 450px max-width 930px , 12) {
+        // @include span-columns(2)
+      }
+      @include media(max-width 450px , 12) {
+        // @include span-columns(3)
+      }
+    }
+    .contain{
+      @include media(min-width 450px max-width 930px , 12) {
+        @include span-columns(8);
+      }
+      @include media(max-width 450px , 12) {
+        @include span-columns(8);
+      }
+    }
+  }
+}
+// Widget profile de la sidbar
+.profil{
+  @include outer-container(100%);
+  // padding: 1px;
+  // border: 1px solid #dedede;
+  background: $greyLight;
+  margin: 20px 0px;
+  overflow: hidden;
+  .user{
+    @include outer-container;
+    background: $white;
+    display:block;
+    position:relative;
+    @include clearfix;
+    box-shadow: 0px 1px 12.4px 4px rgba(0, 0, 0, 0.50); 
+  }
+  .thumb{
+    @include span-columns(6 of 12);
+    height: 100px;
+  }
+  .info{
+    color: $grey;
+    font-family: $standardFont;
+    @include span-columns(6 of 12);
+    padding: 10px 5px;
+    @include omega;
+  }
+  .nav{
+    @include clearfix;
+    background: $red;
+    display: flex;
+    justify-content: space-around;
+    .onglet{
+      &:hover{
+        background: $redDark;
+      }
+      &.active{
+        background: $redDark;
+      }
+      @include span-columns(4 of 12);
+      padding: 20px 10px;
+      // margin: 10px;
+      font-size: 0.75em;
+      text-align: center;
+      font-family: standardFont;
+      color: $white;
+      text-decoration: none;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      img{
+        height: 70%;
+        padding: 10px;
+        align-self: center;
+      }
+      h4{
+        align-self: center;
+        text-align: center;
+      }
+    }
+  }
+  .encre{
+    ul {
+      padding: 0px;
+      list-style: none;
+      li {
+        a{
+          text-decoration: none;
+          color: $black;
+          padding: 10px;
+          display: block;
+          // border: solid 1px #E3001B;
+          &:hover{
+            color: $white;
+            color: $red;
+            background: $red;
+            background: $white;
+          }
+        }
+      }
+    }
+  }
+}
+  
