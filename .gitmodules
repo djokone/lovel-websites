@@ -1,0 +1,3 @@
+[submodule "Modules/DatabasesManager"]
+	path = Modules/DatabasesManager
+	url = https://github.com/djokone/DatabasesManager.git
