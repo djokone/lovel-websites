@@ -1,13 +1,13 @@
 import Media from '@/Modules/Medias/Services/Media'
 import Database from '@/Modules/DatabasesManager/DatabaseManager'
 
-export async function getRefMediasFirebase ({
-  dispatch
-}, {
-  verbose = false,
-  refId,
-  ref
-}) {
+export async function getRefMediasFirebase({
+                                             dispatch
+                                           }, {
+                                             verbose = false,
+                                             refId,
+                                             ref
+                                           }) {
   try {
     if (verbose) {
       console.log('Start getting Media By Ref : ' + ref)
@@ -38,13 +38,13 @@ export async function getRefMediasFirebase ({
   }
 }
 
-export async function addMediaStorageUri ({
-  dispatch
-}, {
-  id,
-  storagePath,
-  verbose
-}) {
+export async function addMediaStorageUri({
+                                           dispatch
+                                         }, {
+                                           id,
+                                           storagePath,
+                                           verbose
+                                         }) {
   let storageUri = await firebase.storage.getDownloadUrl({
     remoteFullPath: storagePath
   })
@@ -62,7 +62,7 @@ export async function addMediaStorageUri ({
   })
 }
 
-export async function adminDeleteMedia ({dispatch}, {
+export async function adminDeleteMedia({dispatch}, {
   entity,
   id
 }) {
@@ -81,7 +81,7 @@ export async function adminDeleteMedia ({dispatch}, {
   }
 }
 
-export async function adminDeleteMedias ({dispatch, getters}, {
+export async function adminDeleteMedias({dispatch, getters}, {
   entity = Media,
   data,
   verbose = getters.debug,
@@ -112,7 +112,7 @@ export async function adminDeleteMedias ({dispatch, getters}, {
   }
 }
 
-export async function adminLoadMedias ({ dispatch, getters }, params = {
+export async function adminLoadMedias({dispatch, getters}, params = {
   entity: Media,
   collection: 'medias',
   lasyLoad: true,
@@ -133,7 +133,7 @@ export async function adminLoadMedias ({ dispatch, getters }, params = {
   return await dispatch('firestoreLoadEntities', params)
 }
 
-export async function adminLoadMedia ({ dispatch, getters }, params = {
+export async function adminLoadMedia({dispatch, getters}, params = {
   id: false,
   lasyLoad: false,
   collection: 'medias',
@@ -152,7 +152,7 @@ export async function adminLoadMedia ({ dispatch, getters }, params = {
   return await dispatch('firestoreLoadEntity', params)
 }
 
-export async function adminEditMedia ({ dispatch }, {
+export async function adminEditMedia({dispatch}, {
   id,
   toSave,
   verbose,
