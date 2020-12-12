@@ -1,13 +1,19 @@
 const admin = require('firebase-admin');
 const functions = require('firebase-functions');
-exports.cleanUser = functions
+exports.cleanUsersCollection = functions
   .runWith({memory: "2GB", timeoutSeconds: 300})
   .https
-  .onCall(cleanUser)
+  .onCall(cleanUsersCollection)
 
 const db = admin.firestore()
 
-async function cleanUser(data, context) {
+/**
+ * Remove users that doesn't have created field, used has an utils function
+ * @param data
+ * @param context
+ * @returns {Promise<{renameUsersMedia: []}>}
+ */
+async function cleanUsersCollection(data, context) {
   const medias = await db.collection('users').get()
   // console.debug(medias)
   let renameUsersMedia = []

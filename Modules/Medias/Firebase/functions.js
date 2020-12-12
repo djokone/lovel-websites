@@ -13,6 +13,7 @@ const syncStorageWithMedia = true
 // Default behavior config
 const defaultBehavior = {
   "deleteStorageFile": {
+    "id": true,
     "coverCollection": true,
     "coverId": true,
     "deletePrefixesCollection": true,
@@ -21,10 +22,11 @@ const defaultBehavior = {
     // "formatCover": "replace"
   },
   "newStorageFile": {
+    "id": true,
     "mediaCollection": "medias", // "string" | Boolean
     "coverCollection": true,
     "coverId": true,
-    "addMedia": false,
+    "addMedia": true,
     "cleanMedia": true
   }
 }
@@ -81,9 +83,9 @@ exports.deleteStorageFile = functions
   .onDelete(onDeleteMediaHandler)
 
 /**
- * Run resize prefixes process prefix When a new image is added to google storage
- * @param object - Image added metadata
- * @returns {Promise<boolean|{id: *, collection: *, prefixesPaths: {}, uploads: *}>}
+ * Handle function when a file is deleted in firebase storage
+ * @param object
+ * @returns {Promise<void>}
  */
 async function onDeleteMediaHandler(object) {
   // const bucket = gcs.bucket(object.bucket)
@@ -116,7 +118,7 @@ exports.addStorageFile = functions
   .onFinalize(onFinalizeMediaHandler)
 
 /**
- * Run resize prefixes process prefix When a new image is added to google storage
+ * When a new image is added to google storage
  * @param object - Image added metadata
  * @returns {Promise<boolean|{id: *, collection: *, prefixesPaths: {}, uploads: *}>}
  */
@@ -155,6 +157,7 @@ async function isUserCover({storage_path}) {
   const id = folders[1]
 }
 
+
 exports.changeStorageUsersMediaName = functions
   .runWith({memory: "2GB", timeoutSeconds: 300})
   .https
@@ -163,6 +166,12 @@ exports.changeStorageUsersMediaName = functions
 const bucket = admin.storage().bucket();
 const bucketName = bucket.name;
 
+/**
+ *
+ * @param data
+ * @param context
+ * @returns {Promise<{renameUsersMedia: []}>}
+ */
 async function changeStorageUsersMediaNameHandler(data, context) {
   const gcpBucket = gcs.bucket(bucketName)
   const medias = await db.collection('medias').where('ref', '==', 'users').get()

@@ -9,9 +9,13 @@ const gcs = new Storage()
 const bucket = admin.storage().bucket();
 const bucketName = bucket.name;
 const db = admin.firestore()
+const FieldValue = admin.firestore.FieldValue
 const gcsDefaultBucket = gcs.bucket(bucketName)
+
 const workingDir = join(tmpdir(), 'resize')
 const tmpFilePath = join(workingDir, 'source.png')
+const mediaCollection = 'Medias'
+
 
 // Default resize config
 const prefixesConfig = {
@@ -47,6 +51,10 @@ const prefixesConfig = {
       "size": 400
     },
     {
+      "name": "thumb",
+      "size": 200
+    },
+    {
       "name": "big",
       "size": 800
     },
@@ -63,42 +71,61 @@ function mapMetadata(storage_path, selectedConfig) {
   const ext = storage_path.split('.').pop()
   const imageName = storage_path.replace('.' + ext, '')
   const prefixFilename = `${filename}@resized_${selectedConfig.name}.${ext}`
-  // console.log('get prefix metadata')
-  // console.log(config)
   const newImageName = `${imageName}@resized_${selectedConfig.name}.${ext}`
   const tmpDestination = join(workingDir, prefixFilename)
   const destination = join(bucketDir, prefixFilename)
   return {...selectedConfig, ext, imageName, destination, tmpDestination}
 }
 
+async function getFileMetadata(storage_path) {
+  const storageFile = gcsDefaultBucket.file(storage_path)
+  let fileExist = await storageFile.exists()
+  fileExist = fileExist[0]
+  let metadata = {}
+  let response = {}
+  if (fileExist) {
+    const data = await storageFile.getMetadata()
+    metadata = data[0]
+    response = data[1]
+  } else {
+    console.warn(storage_path + ' doesn\'t exist anymore')
+  }
+  return {
+    metadata,
+    response
+  }
+}
+
+async function thisFileExist(storage_path) {
+  const storageFile = gcsDefaultBucket.file(storage_path)
+  let fileExist = await storageFile.exists()
+  fileExist = fileExist[0]
+  return fileExist[0]
+}
+
 // exports.getPrefixesPath = getPrefixesPathMetadata
 /**
  *
  * Upload resized Medias prefixes process
- * @param storage_path
- * @param bucketName
- * @param id
- * @param addMedia
- * @param mediaCollection
- * @param cleanMedia
- * @param storage_path - Media storage path
- * @param bucketName - Storage bucket name
+ *
  * @param id - Media id
+ * @param mediaCollection
+ * @param addMedia
+ * @param cleanMedia
  * @param addMedia - Add Media if id is false or null
  * @param mediaCollection - Handle media collection synchronization
  * @param coverId - Cover id
  * @param coverCollection - Handle cover collection sync
  * @param prefixConfig
- * @param admin - Admin cloud function instance
- * @param db - firestore instance admin.firestore() by default
  * @param object - Storage meta image object
+ * @param storage_path - Media storage path
  * @returns {Promise<boolean|{mediaCollection: boolean, storage_path: *, id: boolean, coverCollection: boolean, prefixesPaths: {}, uploads: unknown[]}>}
  */
 exports.resizeMediaForPrefixes = resizeMediaForPrefixes
 
 async function resizeMediaForPrefixes(
   {
-    id = false,
+    id = true,
     addMedia = false,
     mediaCollection = true,
     cleanMedia = false,
@@ -124,12 +151,34 @@ async function resizeMediaForPrefixes(
       return false
     }
   }
+  // get metadata
+  let {metadata} = await getFileMetadata(storage_path)
+  metadata = {
+    ...metadata,
+    ...metadata.metadata
+  }
+  let authId = null
+  if (!storage_path.includes('@resized_')) {
+    // console.log('Metadata -------------------------')
+    // console.log(metadata)
+    // // console.log(metadata)
+    // console.log('----------------------------------')
+  }
+
+  if (metadata && metadata.authId) {
+    console.log('Get Auth id ' + metadata.authId)
+    authId = object.metadata.authId
+
+  }
   const filePath = storage_path
   const folders = filePath.split('/')
   folders.pop()
   const fileName = filePath.split('/').pop()
+  const positionPrefix = fileName.match(/@p([0-9]+)_/)
+  const positionIndex = positionPrefix[1]
   let mediaId = id
   let media = null
+  let newMediaData = {}
   // const bucketDir = dirname(filePath)
   const workingDir = join(tmpdir(), 'resize')
   const tmpFilePath = join(workingDir, 'source.png')
@@ -144,14 +193,6 @@ async function resizeMediaForPrefixes(
   if (fileName.includes('@resized_') || !object.contentType.includes('image')) {
     return false
   }
-  console.log('Start resizeMediaForPrefixes function with args')
-  console.log('Storage path    : ' + storage_path)
-  console.log('id              : ' + id)
-  console.log('addMedia        : ' + addMedia)
-  console.log('mediaCollection : ' + mediaCollection)
-  console.log('coverCollection : ' + coverCollection)
-  console.log('coverId         : ' + coverId)
-  console.log('cleanMedia      : ' + cleanMedia)
 
   // Auto Collection cover
   if (coverCollection === true) {
@@ -164,7 +205,7 @@ async function resizeMediaForPrefixes(
   }
 
   // Resize with user cover process
-  if (coverCollection && !fileName.includes('@p1_' && coverCollection)) {
+  if (coverCollection && !fileName.includes('@p1_')) {
     coverCollection = false
     console.log('Cancel cover collection resize process')
     // await isUserCover({storage_path: filePath})
@@ -173,10 +214,8 @@ async function resizeMediaForPrefixes(
 
   // Auto Collection media
   if (mediaCollection) {
-    if ('string' === !typeof mediaCollection) {
-      mediaCollection = 'medias'
-      console.log('Default mediaCollection is now ' + mediaCollection)
-    }
+    mediaCollection = 'medias'
+    console.log('Default mediaCollection is now ' + mediaCollection)
 
     // Auto media id
     if (mediaId === true) {
@@ -184,31 +223,44 @@ async function resizeMediaForPrefixes(
       console.log('Start to search if ' + storage_path + ' all ready exist in ' + mediaCollection + ' collection')
       const mediaSnapshot = await db.collection(mediaCollection).where('storage_path', '==', storage_path).get()
       mediaSnapshot.forEach((media) => {
-        mediaData.push({...media.data(), id: doc.id})
+        mediaData.push({...media.data(), id: media.id})
       })
-      console.log('found ' + mediaData.length + ' ' + mediaCollection)
+      console.log(mediaData.length + ' ' + mediaCollection + ' founded')
       if (mediaData.length > 0) {
         media = mediaData[0]
         mediaId = media.id
       } else {
         media = null
+        mediaId = false
         console.warn('no medias found')
       }
       if (cleanMedia && mediaData.length > 1) {
         console.warn('Todo : Clean medias process')
       }
     }
-
     // Add new media id
-    if (addMedia && !media && mediaCollection) {
-      mediaId = db.collection(mediaCollection).doc()
-      console.log('Start to create a new doc with')
-      console.log('media id : ' + mediaId)
+    if (addMedia && media === null && mediaCollection) {
+      if (!mediaId) {
+        const mediaDoc = db.collection(mediaCollection).doc()
+        mediaId = mediaDoc.id
+        console.log('Start to create a new doc with')
+        console.log('media id : ' + mediaId)
+      }
+      newMediaData = {
+        created: FieldValue.serverTimestamp(),
+        index: parseInt(positionIndex),
+        ref: storage_path.split('/')[0],
+        type: 'image',
+        ref_id: coverId
+      }
+      if (authId) {
+        newMediaData['created_user_id'] = authId
+      }
     }
   }
   console.log('Automatic params has been set')
   console.log('Storage path    : ' + storage_path)
-  console.log('id              : ' + id)
+  console.log('id              : ' + mediaId)
   console.log('addMedia        : ' + addMedia)
   console.log('mediaCollection : ' + mediaCollection)
   console.log('coverCollection : ' + coverCollection)
@@ -221,12 +273,8 @@ async function resizeMediaForPrefixes(
     configs = prefixesConfig['users']
   }
   const prefixesPathData = configs.map((config) => mapMetadata(storage_path, config))
-  // console.log('prefixesPathData ---------------------------------------')
-  // console.log(prefixesPathData)
-  // console.log('End of prefixesPathData ---------------------------------------')
   console.log('Number of prefixes path : ' + prefixesPathData.length)
-  console.log('prefixes path data : ')
-  console.log(prefixesPathData)
+
   // prefixes handled
   let prefixesPaths = {}
   for (let data of prefixesPathData) {
@@ -237,27 +285,28 @@ async function resizeMediaForPrefixes(
   await fs.ensureDir(workingDir)
 
   // Upload prefixes image
-  const fileExist = await gcsDefaultBucket.file(storage_path).exists()
-  const isFileExist = fileExist[0]
-  if (isFileExist) {
-    await gcsDefaultBucket.file(storage_path).download({destination: tmpFilePath})
-    console.log('File download to ' + tmpFilePath)
-  } else {
-    console.warn('File doesn\'t exist')
-    console.warn('Path : ' + filePath)
-    return false
-  }
+  // const isFileExist = await thisFileExist(storage_path)
+  // if (isFileExist) {
+  await gcsDefaultBucket.file(storage_path).download({destination: tmpFilePath})
+  console.log('File download to ' + tmpFilePath)
+  // } else {
+  //   console.warn('File doesn\'t exist')
+  //   console.warn('Path : ' + storage_path)
+  //   return false
+  // }
   const uploadPromises = prefixesPathData.map(async (data) => {
     console.log('Resize upload to ' + data.tmpDestination)
     await sharp(tmpFilePath).resize(data.size).toFile(data.tmpDestination)
     console.log('Start upload ' + data.tmpDestination + ' to ' + data.destination)
     return gcsDefaultBucket.upload(data.tmpDestination, {
       destination: data.destination,
-      metaData: {
-        mediaId,
-        coverCollection,
-        coverId,
-        mediaCollection
+      metadata: {
+        metadata: {
+          mediaId,
+          coverCollection,
+          coverId,
+          mediaCollection
+        }
       }
     })
   })
@@ -270,7 +319,8 @@ async function resizeMediaForPrefixes(
     console.log('Start to set ' + mediaCollection + ' #' + mediaId)
     try {
       await db.collection(mediaCollection).doc(mediaId).set({
-        storage_path,
+        ...newMediaData,
+        storage_path: storage_path,
         prefixesPaths
       }, {merge: true})
       console.log('Finish to set ' + mediaCollection + ' #' + mediaId)
@@ -283,7 +333,7 @@ async function resizeMediaForPrefixes(
   }
 
   // Start to handle cover collection and set data
-  console.log('Will set cover : ' + mediaCollection && mediaId)
+  console.log('Will set cover : ' + coverCollection && coverId)
   if (coverCollection && coverId) {
     console.log('Start to set ' + coverCollection + ' #' + coverId)
     try {
@@ -308,6 +358,12 @@ async function resizeMediaForPrefixes(
     storage_path,
     prefixesPaths
   }
+}
+
+exports.formatUserMedias = formatMedias
+
+async function formatMedias() {
+
 }
 
 /**
@@ -348,9 +404,12 @@ async function removeMedia(
   const ext = filename.split('.')[1]
   let originalStorage = storagePath
   let prefix = false
+  let medias = []
+  let originalExist = false
   if (storagePath.includes('@resized_')) {
-    originalStorage = filename.split('@resized_')[0] + '.' + ext
-    // prefix = filename.split('@resized_')[1].split('.')[0]
+    originalStorage = storagePath.replace(/@resized_[a-zA-Z\-_]+/, '')
+    prefix = storagePath.match(/@resized_([a-zA-Z\-_]+)/)[1]
+    originalExist = thisFileExist(originalStorage)
   }
   const isCover = storagePath.includes('@p1_')
 
@@ -366,52 +425,59 @@ async function removeMedia(
 
   // Get automatically media id
   if (mediaId === true) {
-    mediaId = object.mediaId
-    console.log('Metadata mediaId : ' + mediaId)
-    if (typeof mediaId === 'undefined') {
-      let ids = []
-      const snapshot = await db.collection('medias').where('storage_path', '==', originalStorage).get()
+    let {metadata} = await getFileMetadata(originalStorage)
+    const hasMetadataMediaId = metadata && metadata.customMetadata && metadata.customMetadata.mediaId
+    if (hasMetadataMediaId) {
+      mediaId = metadata.customMetadata.mediaId
+      console.log('Metadata mediaId : ' + mediaId)
+    } else {
+      console.warn('Has no mediaId in custom metadata')
+    }
+    if (!hasMetadataMediaId) {
+
+      console.log('Start to look for an id in firestore database with this storage_path : ' + originalStorage)
+      const snapshot = await db.collection('medias').where('storage_path', '==', '' + originalStorage).get()
       snapshot.forEach(doc => {
-        ids.push(doc.id)
+        medias.push({
+          id: doc.id,
+          ...doc.data()
+        })
       })
-      if (!snapshot.empty) {
-        mediaId = false
+      if (medias.length) {
+        mediaId = medias[0].id
       } else {
-        mediaId = ids[0]
+        mediaId = false
       }
+      console.log('Found ' + medias.length + ' medias matching with ' + originalStorage)
     }
   }
 
   // remove file fields if it's resized file
-  if (storagePath.includes('@resized_')) {
-    prefix = filename.split('@resized_')[1].split('.')[0]
-
+  if (prefix && originalExist) {
     // remove cover collection fields
     if (isCover && coverCollection) {
-      console.log('Start to remove ' + coverCollection + ' #' + coverId + ' fields')
+      console.log('Start to remove ' + coverCollection + ' #' + coverId + ' fields for ' + prefix + ' prefix')
       await resetCollectionFromMedia({
         collection: coverCollection,
         id: coverId,
         storage_path: false,
-        prefix,
-        db
+        prefix
       })
     }
 
     // remove media fields
     if (mediaId) {
-      console.log('Start to remove media #' + mediaId + ' fields')
+      console.log('Start to remove media #' + mediaId + ' fields with prefix ' + prefix)
       await resetCollectionFromMedia({
         collection: 'medias',
         id: mediaId,
         prefix,
-        storage_path: false,
-        db
+        storage_path: false
       })
     }
   }
   // Stop process if it's a resized image or not an image at all
-  if (storagePath.includes('@resized_') || !object.contentType.includes('image')) {
+  if (storagePath.includes('@resized_')) {
     return null
   }
 
@@ -425,7 +491,9 @@ async function removeMedia(
   }
 
   // Set media collection document
+  console.log('Will remove media document in medias collection : ' + mediaId)
   if (mediaId) {
+    console.log('Start to remove media #' + mediaId)
     await removeMediaCollection({
       storage_path: storagePath,
       id: mediaId,
@@ -435,7 +503,9 @@ async function removeMedia(
   }
 
   // Delete prefixes files
+  console.log('will remove prefixes files : ' + deletePrefixes)
   if (deletePrefixes) {
+    console.log('Start delete prefixes file for ' + storagePath)
     deletePrefixes = await deletePrefixesFiles({storage_path: storagePath})
   }
 
@@ -459,33 +529,49 @@ async function replaceCover(
 
 }
 
-
+/**
+ * Reset collection from the media behavior
+ *
+ *
+ * @param id
+ * @param collection - Media behavior collection
+ * @param storage_path - Remove storage path
+ * @param prefix - Remove a specific prefix, if prefix = "all" it will remove all prefix Urls
+ * @param verbose - Active verbose mode
+ * @returns {Promise<{storage_path: boolean, prefix: boolean, id: string, collection: *}>}
+ */
 async function resetCollectionFromMedia(
   {
     id,
     collection,
     storage_path = true,
     prefix = false,
+    prefixesUrl = true,
+    prefixesPaths = false,
+    verbose = true
     // db
   }
 ) {
   const data = {}
+  if (verbose) {
+    console.log('Start to set ' + collection + ' #' + id)
+    console.log('Prefix        : ' + prefix)
+    console.log('Storage path  : ' + storage_path)
+  }
   if (storage_path) {
-    data['storage_path'] = db.FieldValue.delete()
+    data['storage_path'] = FieldValue.delete()
   }
-  if (prefix) {
-    data['prefixesUrl'] = {}
-    data['prefixesUrl'][prefix] = db.FieldValue.delete()
-  } else if (prefix === 'all') {
-    data['prefixesUrl'] = db.FieldValue.delete()
-
+  if (prefix === 'all') {
+    data['prefixesUrl'] = FieldValue.delete()
+    // data['prefixesUrl'] = {}
+  } else if (prefix) {
+    data['prefixesUrl.' + prefix] = FieldValue.delete()
   }
-  console.log('Start to set ' + collection + ' #' + id)
-  console.log('Prefix     : ' + prefix)
-  console.log('All        : ' + all)
-  console.log('With datas :')
-  console.log(data)
-  await db.collection(collection).doc(id).set(data, {merge: true})
+  if (verbose) {
+    console.log('With datas to update: ')
+    console.log(data)
+  }
+  await db.collection(collection).doc(id).update(data)
   return {
     id,
     collection,
@@ -505,7 +591,8 @@ async function removeMediaCollection(
   let media = null
   let medias = []
   if (typeof id !== 'string') {
-    let snapshots = await db.collections('medias').where('storage_path', '==', storage_path).get()
+    console.log('Start to search media')
+    let snapshots = await db.collection('medias').where('storage_path', '==', storage_path).get()
     snapshots.forEach((snap) => {
       medias.push({
         ...snap.data(),
@@ -513,7 +600,7 @@ async function removeMediaCollection(
       })
     })
   } else {
-    media = await db.collections('medias').doc(id)
+    media = await db.collection('medias').doc(id)
     medias.push(media)
   }
   let promises = medias.map((media) => {
