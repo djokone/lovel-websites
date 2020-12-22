@@ -1,6 +1,6 @@
 const functions = require('firebase-functions');
 const {Nuxt} = require('nuxt');
-const {getMedia, addStorageFile, changeStorageUsersMediaName, formatMediasWithStorage, removePublicUrl, saveCoverToUser, resizeMediaForPrefixes, deleteStorageFile} = require('./Modules/Medias/Firebase/functions')
+const {resizeFile, mediaMigrate, formatMedias, getMedia, addStorageFile, changeStorageUsersMediaName, formatMediasWithStorage, removePublicUrl, saveCoverToUser, resizeMediaForPrefixes, deleteStorageFile} = require('./Modules/Medias/Firebase/functions')
 const {cleanUsersCollection} = require('./Modules/Users/Firebase/functions')
 
 const nuxtConfig = require('./nuxt.config.js');
@@ -31,7 +31,10 @@ exports.deleteStorageFile = deleteStorageFile
 // When a new file is added to the main firestore storage
 exports.addStorageFile = addStorageFile
 
+exports.mediaMigrate = mediaMigrate
+
 exports.getMedia = getMedia
+exports.resizeFile = resizeFile
 
 exports.changeStorageUsersMediaName = changeStorageUsersMediaName
 
@@ -39,9 +42,8 @@ exports.removePublicUrl = removePublicUrl
 
 exports.saveCoverToUser = saveCoverToUser
 
-
 exports.formatMediasWithStorage = formatMediasWithStorage
-
+exports.formatMedias = formatMedias
 
 exports.resizeMediaForPrefixes = resizeMediaForPrefixes
 

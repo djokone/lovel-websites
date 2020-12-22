@@ -2,9 +2,10 @@ const functions = require('firebase-functions')
 const admin = require('firebase-admin');
 admin.initializeApp();
 const {Storage} = require('@google-cloud/storage')
-const {resizeMediaForPrefixes, removeMedia} = require('./utils')
+const mediaActions = require('./utils')
 const {dirname, join} = require('path')
 const sharp = require('sharp')
+const {tmpdir} = require('os')
 const fs = require('fs-extra')
 const gcs = new Storage()
 const db = admin.firestore()
@@ -95,7 +96,7 @@ async function onDeleteMediaHandler(object) {
   if (defaultBehavior && defaultBehavior.deleteStorageFile) {
     console.log('Start to remove Media')
     try {
-      await removeMedia({
+      await mediaActions.removeMedia({
         ...defaultBehavior.deleteStorageFile,
         // storagePath: object.name,
         object
@@ -127,12 +128,39 @@ async function onFinalizeMediaHandler(object) {
   const filePath = object.name
   console.log('New added file detected')
   console.log('File : ' + object.name)
-  if (defaultBehavior && defaultBehavior.deleteStorageFile) {
+  if (defaultBehavior && defaultBehavior.newStorageFile) {
     try {
-      await resizeMediaForPrefixes({
+      await mediaActions.addMedia({
         ...defaultBehavior.newStorageFile,
-        object,
+        object
+      })
+    } catch (e) {
+      console.error('Error detected during resizeMediaForPrefixes')
+      console.error('When ' + object.name + ' file is added')
+      console.error(e)
+      throw e
+    }
+  }
+}
+
+exports.resizeMediaForPrefixes = functions
+  .runWith({memory: "2GB", timeoutSeconds: 300})
+  .https
+  .onCall(resizeMediaForPrefixesHandler)
+
+
+async function resizeMediaForPrefixesHandler(data, context) {
+  if (data) {
+
+  }
+  console.log('New added file detected')
+  console.log('File : ' + data.name)
+  if (defaultBehavior && defaultBehavior.newStorageFile) {
+    try {
+      await mediaActions.resizeMediaForPrefixes({
+        ...defaultBehavior.newStorageFile,
         prefixesConfig,
+        storage_path: data.storage_path,
         mediaCollection: true
       })
     } catch (e) {
@@ -143,12 +171,6 @@ async function onFinalizeMediaHandler(object) {
   }
 }
 
-exports.resizeMediaForPrefixes = functions
-  .runWith({memory: "2GB", timeoutSeconds: 300})
-  .https
-  .onCall(resizeMediaForPrefixes)
-
-
 async function isUserCover({storage_path}) {
   const filePath = storage_path
   const folders = filePath.split('/')
@@ -157,22 +179,185 @@ async function isUserCover({storage_path}) {
   const id = folders[1]
 }
 
+exports.mediaMigrate = functions
+  .runWith({memory: "2GB", timeoutSeconds: 540})
+  .https
+  .onCall(migrationHandler)
 
-exports.changeStorageUsersMediaName = functions
+// exports.mediaMigration = functions
+//   .runWith({memory: "2GB", timeoutSeconds: 300})
+//   .https
+//   .onCall(migrationHandler)
+
+async function migrationHandler(migrationOptions) {
+  let {
+    limit,
+    check,
+    version,
+    wheres,
+    direction,
+    migrationChecks
+  } = {
+    limit: 'all',
+    wheres: [],
+    version: false,
+    check: true,
+    migrationChecks: false,
+    formatOptions: false,
+    format: true,
+    direction: false,
+    ...migrationOptions
+  }
+  let mediaCollection = db.collection('medias')
+  const {migrations} = require('./migrations')
+  console.log(`${migrations.length} migrations founded for media`)
+  let medias = []
+  if (Array.isArray(wheres)) {
+    for (where of wheres) {
+      console.log('Apply where filter : ' + where.join(' '))
+      mediaCollection = mediaCollection.where(...where)
+    }
+  }
+  if (typeof limit === 'number') {
+    console.log('Active limit to ' + limit)
+    mediaCollection = mediaCollection.limit(limit)
+  }
+  const mediasSnapshot = await mediaCollection.get()
+  mediasSnapshot.forEach((media) => {
+    medias.push({...media.data(), id: media.id})
+  })
+  console.log(`${medias.length} medias founded to check`)
+  let ups = []
+  let downs = []
+  let checks = {}
+  if (migrationChecks) {
+    ups = migrationChecks.ups
+    downs = migrationChecks.downs
+    checks = migrationChecks.checks
+    check = false
+  }
+
+  // check process
+  if (check && migrations.length) {
+    for (let mediaMigration of migrations) {
+      if (!mediaMigration.version) {
+        throw `Need migration version key to each migrations`
+      }
+
+      const checksPromises = medias.map((media) => {
+        return mediaMigration.check(media)
+      })
+      checks[mediaMigration.version] = await Promise.all(checksPromises)
+      ups = checks[mediaMigration.version].filter(check => check.isUp === true)
+      downs = checks[mediaMigration.version].filter(check => !check.isUp)
+    }
+  }
+
+  // migration direction
+  const directions = ['up', 'down']
+  if (typeof direction === 'string' && !directions.includes(direction)) {
+    throw `Direction need to be 'up'||'down'||false actually : '${direction}'`
+  } else if (direction === true) {
+    direction = 'up'
+  }
+  if (direction) {
+
+  }
+
+  return {
+    checks,
+    ups,
+    downs
+  }
+}
+
+function getArgs(func) {
+  return (func + '')
+    .replace(/[/][/].*$/mg, '') // strip single-line comments
+    .replace(/\s+/g, '') // strip white space
+    .replace(/[/][*][^/*]*[*][/]/g, '') // strip multi-line comments
+    .split('){', 1)[0].replace(/^[^(]*[(]/, '') // extract the parameters
+    .replace(/=[^,]+/g, '') // strip any ES6 defaults
+    .split(',').filter(Boolean); // split & filter [""]
+}
+
+async function formatMediasHandler(formatMediasOptions, context) {
+  let {
+    migrationChecks,
+    action,
+    actionArgs
+  } = {
+    entitiesArgs: [],
+    ...formatMediasOptions
+  }
+  const allActions = Object.keys(mediaActions)
+  const actionsMapping = allActions.map((action) => {
+    let actionsArgs = getArgs(mediaActions[action])
+    actionsArgs[0] = actionsArgs[0].replace('{', '')
+    if (actionsArgs.length && actionsArgs[actionsArgs.length - 1].match('}')) {
+      actionsArgs.splice(actionsArgs.length - 1, 1)
+    }
+    return {
+      action: action,
+      actionsArgs
+    }
+  })
+  if (!migrationChecks) {
+    return {actionsMapping}
+  }
+  if (!Array.isArray(migrationChecks)) {
+    migrationChecks = Object.keys(migrationChecks).reduce((acc, v) => {
+      return [...acc, ...v]
+    })
+  }
+  const formatAction = mediaActions[actions]
+  if (typeof formatAction === 'function') {
+    const actionsPromises = migrationChecks.map((migration) => {
+      return formatAction({
+        ...actionArgs
+      })
+    })
+    try {
+
+      // await formatAction()
+    } catch (e) {
+
+    }
+  }
+
+  return {
+    actionsMapping
+  }
+}
+
+exports.formatMedias = functions
   .runWith({memory: "2GB", timeoutSeconds: 300})
   .https
-  .onCall(changeStorageUsersMediaNameHandler)
+  .onCall(formatMediasHandler)
+/**
+ *
+ * Expose changeStorageUsersMedia
+ */
+exports.migrateStoragePath = functions
+  .runWith({memory: "2GB", timeoutSeconds: 300})
+  .https
+  .onCall(migrateStoragePathHandler)
 
 const bucket = admin.storage().bucket();
 const bucketName = bucket.name;
 
 /**
  *
+ * Migrate storagePath to add @p before the file index number
+ * change old storagaPath name "{p}_{ref_id}.jpg" to new one "@p{p}_{ref_id}.jpg"
  * @param data
  * @param context
  * @returns {Promise<{renameUsersMedia: []}>}
  */
-async function changeStorageUsersMediaNameHandler(data, context) {
+async function migrateStoragePathHandler(
+  {
+    renameCollection = false
+  }, context) {
   const gcpBucket = gcs.bucket(bucketName)
   const medias = await db.collection('medias').where('ref', '==', 'users').get()
   // console.debug(medias)
@@ -208,6 +393,7 @@ async function changeStorageUsersMediaNameHandler(data, context) {
   }
 }
 
+
 function renameMedia(storagePath) {
   const folders = storagePath.split('/')
   folders.pop()
@@ -227,32 +413,45 @@ exports.formatMediasWithStorage = functions
   .https
   .onCall(formatMediasWithStorageHandler)
 
-async function formatMediasWithStorageHandler(data, context) {
-  const medias = await db.collection('medias').where('ref', '==', 'users').get()
-  // console.debug(medias)
-  let renameUsersMedia = []
-  medias.forEach((snapshot) => {
-    const media = snapshot.data()
-    if (!media.storage_path) {
-      console.warn(snapshot.id + ' has no storage path.')
-    } else {
-      const newStoragePath = renameMedia(media.storage_path)
-      renameUsersMedia.push({
-        id: snapshot.id,
-        oldPath: media.storage_path,
-        newPath: newStoragePath
-      })
-    }
-  })
-  const renameUserMediaPromises = renameUsersMedia.map(async ({oldPath, newPath, id}) => {
-    const mediaDoc = db.collection('medias').doc(id)
-    console.log('Rename ' + oldPath + ' to ' + newPath)
-    return mediaDoc.set({storage_path: newPath}, {merge: true})
-  })
-  await Promise.all(renameUserMediaPromises)
-  return {
-    renameUsersMedia
+async function formatMediasWithStorageHandler(
+  data = {
+    verbose: false,
+    ref: false,
+    refId: false,
+    ...data
+  },
+  context) {
+  if (data.verbose) {
+    console.log(`Start formatMediasWithStorage\n ref: ${data.ref}, refId: ${data.refId}`)
   }
+  await formatMedias({
+    ...data
+  })
+  // const medias = await db.collection('medias').where('ref', '==', 'users').get()
+  // // console.debug(medias)
+  // let renameUsersMedia = []
+  // medias.forEach((snapshot) => {
+  //   const media = snapshot.data()
+  //   if (!media.storage_path) {
+  //     console.warn(snapshot.id + ' has no storage path.')
+  //   } else {
+  //     const newStoragePath = renameMedia(media.storage_path)
+  //     renameUsersMedia.push({
+  //       id: snapshot.id,
+  //       oldPath: media.storage_path,
+  //       newPath: newStoragePath
+  //     })
+  //   }
+  // })
+  // const renameUserMediaPromises = renameUsersMedia.map(async ({oldPath, newPath, id}) => {
+  //   const mediaDoc = db.collection('medias').doc(id)
+  //   console.log('Rename ' + oldPath + ' to ' + newPath)
+  //   return mediaDoc.set({storage_path: newPath}, {merge: true})
+  // })
+  // await Promise.all(renameUserMediaPromises)
+  // return {
+  //   renameUsersMedia
+  // }
 }
 
 exports.removePublicUrl = functions
@@ -327,6 +526,98 @@ async function saveCoverToUser(data, context) {
   }
 }
 
+const sizeInterval = 20
+
+async function resizeFileHandler(resizeOptions, context) {
+  let {
+    orientation,
+    size,
+    storage_path
+  } = {
+    orientation: 'height',
+    ...resizeOptions
+  }
+  let upload = false
+  const filename = storage_path.split('/').pop()
+  const resizedFolder = filename.replace(/.[a-zA-Z]+$/, '').replace(/@/g, '')
+  const gcsDefaultBucket = gcs.bucket(bucketName)
+  let folders = storage_path.split('/')
+  folders.pop()
+  folders = folders.join('/')
+  const orientations = ['height', 'width']
+  if (size.width || size.height) {
+    orientation = orientations.reduce((acc, orient) => {
+      if (size[orient]) {
+        acc = orient
+      }
+      return acc
+    })
+    size = size[orientation]
+  }
+  const targetSize = Math.floor(size / sizeInterval) * sizeInterval
+  const prefix = folders + '/' + resizedFolder
+  const options = {
+    prefix
+  }
+  console.log('Start to search for file in ' + prefix)
+  const [files] = await gcsDefaultBucket.getFiles(options);
+  let selectedFile = files.find((file) => {
+    const matches = {
+      height: '@resized_' + targetSize + '_[0-9]+?_' + filename,
+      width: '@resized_[0-9]+?_' + targetSize + '_' + filename
+    }
+    return file.name.match(matches[orientation])
+  })
+  console.log('selected file : ' + selectedFile)
+  if (!selectedFile) {
+    const workingDir = join(tmpdir(), 'resize')
+    const tmpFilePath = join(workingDir, [targetSize, filename].join('_'))
+    const tmpResizedPath = join(workingDir, ['r', targetSize, filename].join('_'))
+    await fs.ensureDir(workingDir)
+    let newSize = {}
+    newSize[orientation] = targetSize
+    await gcsDefaultBucket.file(storage_path).download({destination: tmpFilePath})
+    const localFile = await sharp(tmpFilePath).resize(newSize).toFile(tmpResizedPath)
+    const newStoragePath = `${folders}/${resizedFolder}/@resized_${localFile.height}_${localFile.width}_${filename}`
+
+    let [upload] = await gcsDefaultBucket.upload(tmpResizedPath, {
+      destination: newStoragePath
+    })
+    selectedFile = {
+      ...localFile,
+      ...upload
+    }
+    await fs.remove(workingDir)
+  } else {
+    const resized = selectedFile.name.split('@resized_')
+    const [height, width] = resized[1].split('_')
+    selectedFile = {
+      ...selectedFile,
+      height,
+      width
+    }
+  }
+  resizeOptions = {
+    ...resizeOptions,
+    size,
+    orientation,
+    storage_path
+  }
+
+  console.log('Found ' + files.length + ' file ')
+  return {
+    timestamp: admin.firestore.Timestamp.now().seconds,
+    resizeOptions,
+    selectedFile,
+    upload
+  }
+}
+
+
+exports.resizeFile = functions
+  .runWith({memory: "2GB", timeoutSeconds: 540})
+  .https
+  .onCall(resizeFileHandler)
 
 exports.getMedia = functions.https.onCall((data, context) => {
   console.log(data)
