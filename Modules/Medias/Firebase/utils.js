@@ -401,7 +401,7 @@ async function addMedia(
   }
   let authId = null
 
-  if (storage_path.includes('@resized_') || !object.contentType.includes('image')) {
+  if (storage_path.includes('@resized_')) {
     if (storage_path.includes('@resized_')) {
       console.log('Resized file detect, abort addFile process')
     }
@@ -428,6 +428,7 @@ async function addMedia(
   let refId = metadata.coverId ? metadata.coverId : autoRefId
   const fileName = filePath.split('/').pop()
   const positionPrefix = fileName.match(/@p([0-9]+)_/)
+  // if (positionPrefix.length)
   const positionIndex = positionPrefix[1]
   let mediaId = id
   let media = null
@@ -631,6 +632,7 @@ async function formatMedias(
 
 /**
  * Remove media in collections
+ *
  * @param storagePath
  * @param bucketName
  * @param id
@@ -760,7 +762,6 @@ async function replaceCover(
 /**
  * Reset collection from the media behavior
  *
- *
  * @param id
  * @param collection - Media behavior collection
  * @param storage_path - Remove storage path
@@ -774,10 +775,7 @@ async function resetCollectionFromMedia(
     collection,
     storage_path = true,
     prefix = false,
-    prefixesUrl = true,
-    prefixesPaths = false,
     verbose = true
-    // db
   }
 ) {
   const data = {}
@@ -857,9 +855,14 @@ const asyncFilter = async (arr, predicate) => {
 
 async function deleteResizedFile(
   {
-    storage_path
+    storage_path,
+    verbose = true
   }
 ) {
+  if (verbose) {
+    console.log('Start to delete Resized File')
+    console.log('StoragePath : ' + storage_path)
+  }
   const filename = storage_path.split('/').pop()
   const resizedFolder = filename.replace(/.[a-zA-Z]+$/, '').replace(/@/g, '')
   let folders = storage_path.split('/')
@@ -938,8 +941,35 @@ async function deletePrefixesFiles(
   }
 }
 
+async function renameStoragePath (
+    {
+      storage_path,
+      verbose = false
+    }
+  ) {
+  if (verbose) {
+    console.log('start renaming storage path')
+  }
+  let newStoragePath = storage_path
+  const folders = storage_path.split('/')
+  folders.pop()
+  const fileName = storage_path.split('/').pop()
+  const nameChunk = fileName.split('_')
+  const isOldName = /^[1-9]_/g
+  if (nameChunk.length === 2 && fileName.match(isOldName)) {
+    const newFileName = '@p' + nameChunk[0] + '_' + nameChunk[1]
+    newStoragePath = [...folders, newFileName].join('/')
+  }
+  await gcsDefaultBucket.file(storage_path).move(newStoragePath)
+  if (verbose) {
+    console.log('Rename ' + storage_path + ' to ' + newStoragePath)
+  }
+}
+
 module.exports = {
+  renameStoragePath,
   addMedia,
+  deleteResizedFile,
   resizeMediaForPrefixes,
   resetCollectionFromMedia,
   deletePrefixesFiles,

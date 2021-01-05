@@ -285,12 +285,18 @@ async function formatMediasHandler(formatMediasOptions, context) {
   let {
     migrationChecks,
     action,
-    actionArgs
+    actionArgs,
+    pipeArgs,
   } = {
     entitiesArgs: [],
     ...formatMediasOptions
   }
+  console.log('Start formatMedia with')
+  console.log('Migrations Checks : ')
+  console.log('Action : ' + action)
+  console.log('Action Args : ' + actionArgs)
   const allActions = Object.keys(mediaActions)
+  let formatActionsResponses = []
   const actionsMapping = allActions.map((action) => {
     let actionsArgs = getArgs(mediaActions[action])
     actionsArgs[0] = actionsArgs[0].replace('{', '')
@@ -305,28 +311,57 @@ async function formatMediasHandler(formatMediasOptions, context) {
   if (!migrationChecks) {
     return {actionsMapping}
   }
+  if (typeof migrationChecks === 'string') {
+    migrationChecks = JSON.parse(migrationChecks)
+  }
+  let migrationChecksArray = []
   if (!Array.isArray(migrationChecks)) {
-    migrationChecks = Object.keys(migrationChecks).reduce((acc, v) => {
-      return [...acc, ...v]
+    const migrationVersions = Object.keys(migrationChecks)
+    migrationVersions.forEach(( v) => {
+      migrationChecksArray = [
+        ...migrationChecksArray,
+        ...migrationChecks[v]
+      ]
     })
   }
-  const formatAction = mediaActions[actions]
+  console.log(migrationChecksArray.length + ' Migration found')
+  const formatAction = mediaActions[action]
   if (typeof formatAction === 'function') {
-    const actionsPromises = migrationChecks.map((migration) => {
-      return formatAction({
-        ...actionArgs
-      })
+    const actionsPromises = migrationChecksArray.map((migration) => {
+      // console.log('Migration')
+      // console.log(migration)
+      const prepareArgs = {}
+        actionArgs.forEach((arg) => {
+          console.log('Pipe arg : ' + arg)
+          console.log(pipeArgs[arg])
+          if (typeof pipeArgs[arg] !== 'undefined') {
+            if (typeof pipeArgs[arg].value !== 'undefined') {
+              prepareArgs[arg] = pipeArgs[arg].value
+            }
+            console.log('pipeValue :')
+            console.log(pipeArgs[arg].pipeValue && migration.media[pipeArgs[arg].pipeValue])
+            if (pipeArgs[arg].pipeValue && migration.media[pipeArgs[arg].pipeValue]) {
+              prepareArgs[arg] = migration.media[pipeArgs[arg].pipeValue]
+            }
+          }
+        })
+      console.log('Preparation :')
+      console.log(prepareArgs)
+      console.log('end Preparation :')
+      return formatAction(prepareArgs)
     })
     try {
-
+      formatActionsResponses = await Promise.all(actionsPromises)
+      console.log(`${actionsPromises.length} ${actions} function has been executed and finished with success`)
       // await formatAction()
     } catch (e) {
-
+      console.error(`During ${action} in FormatMediasHandler cloud function` )
+      console.error(e)
     }
   }
-
   return {
-    actionsMapping
+    actionsMapping,
+    formatActionsResponses
   }
 }
 
@@ -379,6 +414,7 @@ async function migrateStoragePathHandler(
       }
     }
   })
+
   const renameUserMediaPromises = renameUsersMedia.map(async ({oldPath, newPath, id}) => {
     // console.log('bucket name')
     // console.log(bucket)
@@ -498,7 +534,6 @@ exports.saveCoverToUser = functions
 
 async function saveCoverToUser(data, context) {
   const medias = await db.collection('medias').where('ref', '==', 'users').get()
-  // console.debug(medias)
   let renameUsersMedia = []
   medias.forEach((snapshot) => {
     const media = snapshot.data()
@@ -526,90 +561,105 @@ async function saveCoverToUser(data, context) {
   }
 }
 
+
+/**
+ * Resize Storage_
+ * @param resizeOptions
+ * @param context
+ * @returns {Promise<{selectedFile: {width: *, height: *}, upload: boolean, resizeOptions: {orientation: string, size: *, storage_path: *}, timestamp: number}>}
+ */
+
 const sizeInterval = 20
 
 async function resizeFileHandler(resizeOptions, context) {
-  let {
-    orientation,
-    size,
-    storage_path
-  } = {
-    orientation: 'height',
-    ...resizeOptions
-  }
-  let upload = false
-  const filename = storage_path.split('/').pop()
-  const resizedFolder = filename.replace(/.[a-zA-Z]+$/, '').replace(/@/g, '')
-  const gcsDefaultBucket = gcs.bucket(bucketName)
-  let folders = storage_path.split('/')
-  folders.pop()
-  folders = folders.join('/')
-  const orientations = ['height', 'width']
-  if (size.width || size.height) {
-    orientation = orientations.reduce((acc, orient) => {
-      if (size[orient]) {
-        acc = orient
+  try {
+    let {
+      orientation,
+      size,
+      storage_path
+    } = {
+      orientation: 'height',
+      ...resizeOptions
+    }
+    let upload = false
+    const filename = storage_path.split('/').pop()
+    const resizedFolder = filename.replace(/.[a-zA-Z]+$/, '').replace(/@/g, '')
+    const gcsDefaultBucket = gcs.bucket(bucketName)
+    let folders = storage_path.split('/')
+    folders.pop()
+    folders = folders.join('/')
+    const orientations = ['height', 'width']
+    if (size.width || size.height) {
+      orientation = orientations.reduce((acc, orient) => {
+        if (size[orient]) {
+          acc = orient
+        }
+        return acc
+      })
+      size = size[orientation]
+    }
+    const targetSize = Math.floor(size / sizeInterval) * sizeInterval
+    const prefix = folders + '/' + resizedFolder
+    const options = {
+      prefix
+    }
+    console.log('Start to search for file in ' + prefix)
+    const [files] = await gcsDefaultBucket.getFiles(options);
+    let selectedFile = files.find((file) => {
+      const matches = {
+        height: '@resized_' + targetSize + '_[0-9]+?_' + filename,
+        width: '@resized_[0-9]+?_' + targetSize + '_' + filename
       }
-      return acc
+      return file.name.match(matches[orientation])
     })
-    size = size[orientation]
-  }
-  const targetSize = Math.floor(size / sizeInterval) * sizeInterval
-  const prefix = folders + '/' + resizedFolder
-  const options = {
-    prefix
-  }
-  console.log('Start to search for file in ' + prefix)
-  const [files] = await gcsDefaultBucket.getFiles(options);
-  let selectedFile = files.find((file) => {
-    const matches = {
-      height: '@resized_' + targetSize + '_[0-9]+?_' + filename,
-      width: '@resized_[0-9]+?_' + targetSize + '_' + filename
-    }
-    return file.name.match(matches[orientation])
-  })
-  console.log('selected file : ' + selectedFile)
-  if (!selectedFile) {
-    const workingDir = join(tmpdir(), 'resize')
-    const tmpFilePath = join(workingDir, [targetSize, filename].join('_'))
-    const tmpResizedPath = join(workingDir, ['r', targetSize, filename].join('_'))
-    await fs.ensureDir(workingDir)
-    let newSize = {}
-    newSize[orientation] = targetSize
-    await gcsDefaultBucket.file(storage_path).download({destination: tmpFilePath})
-    const localFile = await sharp(tmpFilePath).resize(newSize).toFile(tmpResizedPath)
-    const newStoragePath = `${folders}/${resizedFolder}/@resized_${localFile.height}_${localFile.width}_${filename}`
+    console.log('selected file : ' + selectedFile)
+    if (!selectedFile) {
+      const workingDir = join(tmpdir(), 'resize')
+      const tmpFilePath = join(workingDir, [targetSize, filename].join('_'))
+      const tmpResizedPath = join(workingDir, ['r', targetSize, filename].join('_'))
+      await fs.ensureDir(workingDir)
+      let newSize = {}
+      newSize[orientation] = targetSize
+      await gcsDefaultBucket.file(storage_path).download({destination: tmpFilePath})
+      const localFile = await sharp(tmpFilePath).resize(newSize).toFile(tmpResizedPath)
+      const newStoragePath = `${folders}/${resizedFolder}/@resized_${localFile.height}_${localFile.width}_${filename}`
 
-    let [upload] = await gcsDefaultBucket.upload(tmpResizedPath, {
-      destination: newStoragePath
-    })
-    selectedFile = {
-      ...localFile,
-      ...upload
+      let [upload] = await gcsDefaultBucket.upload(tmpResizedPath, {
+        destination: newStoragePath
+      })
+      selectedFile = {
+        ...localFile,
+        ...upload
+      }
+      await fs.remove(tmpFilePath)
+    } else {
+      const resized = selectedFile.name.split('@resized_')
+      const [height, width] = resized[1].split('_')
+      selectedFile = {
+        ...selectedFile,
+        height,
+        width
+      }
     }
-    await fs.remove(workingDir)
-  } else {
-    const resized = selectedFile.name.split('@resized_')
-    const [height, width] = resized[1].split('_')
-    selectedFile = {
-      ...selectedFile,
-      height,
-      width
+    resizeOptions = {
+      ...resizeOptions,
+      size,
+      orientation,
+      storage_path
     }
-  }
-  resizeOptions = {
-    ...resizeOptions,
-    size,
-    orientation,
-    storage_path
-  }
 
-  console.log('Found ' + files.length + ' file ')
-  return {
-    timestamp: admin.firestore.Timestamp.now().seconds,
-    resizeOptions,
-    selectedFile,
-    upload
+    console.log('Found ' + files.length + ' file ')
+    return {
+      timestamp: admin.firestore.Timestamp.now().seconds,
+      resizeOptions,
+      selectedFile,
+      upload
+    }
+  } catch (e) {
+    console.error(e)
+    throw e
+  } finally {
+
   }
 }
 
