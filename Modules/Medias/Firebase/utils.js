@@ -399,6 +399,7 @@ async function addMedia(
     ...metadata,
     ...metadata.metadata
   }
+
   let authId = null
 
   if (storage_path.includes('@resized_')) {
@@ -417,6 +418,9 @@ async function addMedia(
   }
   if (metadata) {
     console.log('Start to use metadatas')
+    console.log('metadata :')
+    console.log(metadata)
+
   }
   const filePath = storage_path
   const folders = filePath.split('/')
@@ -427,10 +431,21 @@ async function addMedia(
   let ref = metadata.coverCollection ? metadata.coverCollection : autoRef
   let refId = metadata.coverId ? metadata.coverId : autoRefId
   const fileName = filePath.split('/').pop()
+  let refs = {}
+  if (nbFolder > 2) {
+    for (const key in folders) {
+      if (key % 2 == 0) {
+        const folder = folders[key]
+        refs[folder] = folders[key + 1]
+      }
+    }
+  }
   const positionPrefix = fileName.match(/@p([0-9]+)_/)
-  // if (positionPrefix.length)
-  const positionIndex = positionPrefix[1]
-  let mediaId = id
+  let positionIndex = 0
+  if (positionPrefix && positionPrefix.length >= 2) {
+    positionIndex = positionPrefix[1]
+  }
+  let mediaId = metadata.mediaId ? metadata.mediaId : id
   let media = null
   let newMediaData = {}
 
@@ -941,12 +956,12 @@ async function deletePrefixesFiles(
   }
 }
 
-async function renameStoragePath (
-    {
-      storage_path,
-      verbose = false
-    }
-  ) {
+async function renameStoragePath(
+  {
+    storage_path,
+    verbose = false
+  }
+) {
   if (verbose) {
     console.log('start renaming storage path')
   }
