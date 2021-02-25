@@ -317,7 +317,7 @@ async function formatMediasHandler(formatMediasOptions, context) {
   let migrationChecksArray = []
   if (!Array.isArray(migrationChecks)) {
     const migrationVersions = Object.keys(migrationChecks)
-    migrationVersions.forEach(( v) => {
+    migrationVersions.forEach((v) => {
       migrationChecksArray = [
         ...migrationChecksArray,
         ...migrationChecks[v]
@@ -331,20 +331,20 @@ async function formatMediasHandler(formatMediasOptions, context) {
       // console.log('Migration')
       // console.log(migration)
       const prepareArgs = {}
-        actionArgs.forEach((arg) => {
-          console.log('Pipe arg : ' + arg)
-          console.log(pipeArgs[arg])
-          if (typeof pipeArgs[arg] !== 'undefined') {
-            if (typeof pipeArgs[arg].value !== 'undefined') {
-              prepareArgs[arg] = pipeArgs[arg].value
-            }
-            console.log('pipeValue :')
-            console.log(pipeArgs[arg].pipeValue && migration.media[pipeArgs[arg].pipeValue])
-            if (pipeArgs[arg].pipeValue && migration.media[pipeArgs[arg].pipeValue]) {
-              prepareArgs[arg] = migration.media[pipeArgs[arg].pipeValue]
-            }
+      actionArgs.forEach((arg) => {
+        console.log('Pipe arg : ' + arg)
+        console.log(pipeArgs[arg])
+        if (typeof pipeArgs[arg] !== 'undefined') {
+          if (typeof pipeArgs[arg].value !== 'undefined') {
+            prepareArgs[arg] = pipeArgs[arg].value
           }
-        })
+          console.log('pipeValue :')
+          console.log(pipeArgs[arg].pipeValue && migration.media[pipeArgs[arg].pipeValue])
+          if (pipeArgs[arg].pipeValue && migration.media[pipeArgs[arg].pipeValue]) {
+            prepareArgs[arg] = migration.media[pipeArgs[arg].pipeValue]
+          }
+        }
+      })
       console.log('Preparation :')
       console.log(prepareArgs)
       console.log('end Preparation :')
@@ -355,7 +355,7 @@ async function formatMediasHandler(formatMediasOptions, context) {
       console.log(`${actionsPromises.length} ${actions} function has been executed and finished with success`)
       // await formatAction()
     } catch (e) {
-      console.error(`During ${action} in FormatMediasHandler cloud function` )
+      console.error(`During ${action} in FormatMediasHandler cloud function`)
       console.error(e)
     }
   }
